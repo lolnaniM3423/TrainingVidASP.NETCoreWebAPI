@@ -1,0 +1,6 @@
+@trnvid_HostAddress = http://localhost:5117
+
+GET {{trnvid_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
