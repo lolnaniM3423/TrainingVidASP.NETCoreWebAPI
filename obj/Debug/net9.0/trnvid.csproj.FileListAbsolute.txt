@@ -1,8 +1,0 @@
-C:\Users\Lucky\ASPNET\trnvid\obj\Debug\net9.0\trnvid.csproj.AssemblyReference.cache
-C:\Users\Lucky\ASPNET\trnvid\obj\Debug\net9.0\rpswa.dswa.cache.json
-C:\Users\Lucky\ASPNET\trnvid\obj\Debug\net9.0\trnvid.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\Lucky\ASPNET\trnvid\obj\Debug\net9.0\trnvid.AssemblyInfoInputs.cache
-C:\Users\Lucky\ASPNET\trnvid\obj\Debug\net9.0\trnvid.AssemblyInfo.cs
-C:\Users\Lucky\ASPNET\trnvid\obj\Debug\net9.0\trnvid.csproj.CoreCompileInputs.cache
-C:\Users\Lucky\ASPNET\trnvid\obj\Debug\net9.0\trnvid.MvcApplicationPartsAssemblyInfo.cs
-C:\Users\Lucky\ASPNET\trnvid\obj\Debug\net9.0\trnvid.MvcApplicationPartsAssemblyInfo.cache
