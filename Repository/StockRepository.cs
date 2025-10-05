@@ -1,107 +1,109 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using trnvid.Data;
+using System.Data;
+using Dapper;
 using trnvid.Dtos.Stock;
 using trnvid.Helpers;
 using trnvid.Interfaces;
 using trnvid.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace trnvid.Repository
 {
     public class StockRepository : IStockRepository
     {
-        private readonly ApplicationDBContext _context;
-        public StockRepository(ApplicationDBContext context)
+        private readonly IDbConnection _db;
+        public StockRepository(IDbConnection db)
         {
-            _context = context;
+            _db = db;
         }
 
         public async Task<Stock> CreateAsync(Stock stockModel)
         {
-            await _context.Stocks.AddAsync(stockModel);
-            await _context.SaveChangesAsync();
-            return stockModel;
+            var sql = "sp_CreateStock";
+            var parameters = new
+            {
+                p_Symbol = stockModel.Symbol,
+                p_CompanyName = stockModel.CompanyName,
+                p_Purchase = stockModel.Purchase,
+                p_LastDiv = stockModel.LastDiv,
+                p_Industry = stockModel.Industry,
+                p_MarketCap = stockModel.MarketCap
+            };
+
+            var newStock = await _db.QuerySingleAsync<Stock>(sql, parameters, commandType: CommandType.StoredProcedure);
+            return newStock;
         }
 
         public async Task<Stock?> DeleteAsync(int id)
         {
-            var stockModel = await _context.Stocks.FirstOrDefaultAsync(x => x.Id == id);
-
+            var stockModel = await GetByIdAsync(id);
             if (stockModel == null)
             {
                 return null;
             }
 
-            _context.Stocks.Remove(stockModel);
-            await _context.SaveChangesAsync();
+            var sql = "sp_DeleteStock";
+            await _db.ExecuteAsync(sql, new { p_Id = id }, commandType: CommandType.StoredProcedure);
             return stockModel;
         }
 
         public async Task<List<Stock>> GetAllAsync(QueryObject query)
         {
-            var stocks = _context.Stocks.Include(c => c.Comments).ThenInclude(a => a.AppUser).AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(query.CompanyName))
+            var sql = "sp_GetAllStocks";
+            var parameters = new
             {
-                stocks = stocks.Where(s => s.CompanyName.Contains(query.CompanyName));
-            }
+                p_CompanyName = query.CompanyName,
+                p_Symbol = query.Symbol,
+                p_SortBy = query.SortBy,
+                p_IsDescending = query.IsDecsending,
+                p_Skip = (query.PageNumber - 1) * query.PageSize,
+                p_PageSize = query.PageSize
+            };
 
-            if (!string.IsNullOrWhiteSpace(query.Symbol))
-            {
-                stocks = stocks.Where(s => s.Symbol.Contains(query.Symbol));
-            }
-
-            if (!string.IsNullOrWhiteSpace(query.SortBy))
-            {
-                if (query.SortBy.Equals("Symbol", StringComparison.OrdinalIgnoreCase))
-                {
-                    stocks = query.IsDecsending ? stocks.OrderByDescending(s => s.Symbol) : stocks.OrderBy(s => s.Symbol);
-                }
-            }
-
-            var skipNumber = (query.PageNumber - 1) * query.PageSize;
-
-
-            return await stocks.Skip(skipNumber).Take(query.PageSize).ToListAsync();
+            var stocks = await _db.QueryAsync<Stock>(sql, parameters, commandType: CommandType.StoredProcedure);
+            return stocks.ToList();
         }
 
         public async Task<Stock?> GetByIdAsync(int id)
         {
-            return await _context.Stocks.Include(c => c.Comments).FirstOrDefaultAsync(i => i.Id == id);
+            var sql = "sp_GetStockById";
+            
+            using (var multi = await _db.QueryMultipleAsync(sql, new { p_Id = id }, commandType: CommandType.StoredProcedure))
+            {
+                var stock = await multi.ReadSingleOrDefaultAsync<Stock>();
+                if (stock != null)
+                {
+                    stock.Comments = (await multi.ReadAsync<Comment>()).ToList();
+                }
+                return stock;
+            }
         }
 
         public async Task<Stock?> GetBySymbolAsync(string symbol)
         {
-            return await _context.Stocks.FirstOrDefaultAsync(s => s.Symbol == symbol);
+            var sql = "sp_GetStockBySymbol";
+            return await _db.QuerySingleOrDefaultAsync<Stock>(sql, new { p_Symbol = symbol }, commandType: CommandType.StoredProcedure);
         }
 
-        public Task<bool> StockExists(int id)
+        public async Task<bool> StockExists(int id)
         {
-            return _context.Stocks.AnyAsync(s => s.Id == id);
+            var sql = "sp_StockExists";
+            return await _db.ExecuteScalarAsync<bool>(sql, new { p_Id = id }, commandType: CommandType.StoredProcedure);
         }
 
         public async Task<Stock?> UpdateAsync(int id, UpdateStockRequestDto stockDto)
         {
-            var existingStock = await _context.Stocks.FirstOrDefaultAsync(x => x.Id == id);
-
-            if (existingStock == null)
+            var sql = "sp_UpdateStock";
+            var parameters = new
             {
-                return null;
-            }
-
-            existingStock.Symbol = stockDto.Symbol;
-            existingStock.CompanyName = stockDto.CompanyName;
-            existingStock.Purchase = stockDto.Purchase;
-            existingStock.LastDiv = stockDto.LastDiv;
-            existingStock.Industry = stockDto.Industry;
-            existingStock.MarketCap = stockDto.MarketCap;
-
-            await _context.SaveChangesAsync();
-
-            return existingStock;
+                p_Id = id,
+                p_Symbol = stockDto.Symbol,
+                p_CompanyName = stockDto.CompanyName,
+                p_Purchase = stockDto.Purchase,
+                p_LastDiv = stockDto.LastDiv,
+                p_Industry = stockDto.Industry,
+                p_MarketCap = stockDto.MarketCap
+            };
+            
+            return await _db.QuerySingleOrDefaultAsync<Stock>(sql, parameters, commandType: CommandType.StoredProcedure);
         }
     }
 }

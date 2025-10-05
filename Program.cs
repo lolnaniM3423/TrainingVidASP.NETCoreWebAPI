@@ -1,3 +1,7 @@
+// --- ADD THESE USING STATEMENTS FOR MYSQL AND DAPPER ---
+using System.Data;
+using MySqlConnector;
+// ---
 using trnvid.Data;
 using trnvid.Interfaces;
 using trnvid.Models;
@@ -10,15 +14,15 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
 builder.Services.AddSwaggerGen(option =>
 {
-    option.SwaggerDoc("v1", new OpenApiInfo { Title = "Demo API", Version = "v1" });
+    option.SwaggerDoc("v1", new OpenApiInfo { Title = "Demo API", Version = "vv1" });
     option.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
@@ -49,9 +53,11 @@ builder.Services.AddControllers().AddNewtonsoftJson(options =>
     options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
 });
 
+// --- THIS BLOCK WAS CHANGED FROM SQL SERVER TO MYSQL ---
+// This is used by ASP.NET Identity for managing users and roles.
 builder.Services.AddDbContext<ApplicationDBContext>(options =>
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
 });
 
 builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
@@ -84,6 +90,10 @@ builder.Services.AddAuthentication(options =>
         )
     };
 });
+
+// --- THIS LINE WAS ADDED FOR DAPPER ---
+// This provides the direct database connection to your repositories.
+builder.Services.AddScoped<IDbConnection>(db => new MySqlConnection(connectionString));
 
 
 builder.Services.AddScoped<IStockRepository, StockRepository>();
