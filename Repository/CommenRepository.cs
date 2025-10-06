@@ -1,79 +1,120 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using trnvid.Data;
+using System.Data;
+using Dapper;
 using trnvid.Helpers;
 using trnvid.Interfaces;
 using trnvid.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace trnvid.Repository
 {
     public class CommentRepository : ICommentRepository
     {
-        private readonly ApplicationDBContext _context;
-        public CommentRepository(ApplicationDBContext context)
+        private readonly IDbConnection _db;
+        public CommentRepository(IDbConnection db)
         {
-            _context = context;
+            _db = db;
         }
 
         public async Task<Comment> CreateAsync(Comment commentModel)
         {
-            await _context.Comments.AddAsync(commentModel);
-            await _context.SaveChangesAsync();
-            return commentModel;
+            var sql = "sp_CreateComment";
+            var parameters = new
+            {
+                p_Title = commentModel.Title,
+                p_Content = commentModel.Content,
+                p_StockId = commentModel.StockId,
+                p_AppUserId = commentModel.AppUserId
+            };
+            
+            // Use Dapper's multi-mapping to map both Comment and AppUser
+            var newComment = await _db.QueryAsync<Comment, AppUser, Comment>(
+                sql,
+                (comment, appUser) => 
+                {
+                    comment.AppUser = appUser;
+                    return comment;
+                },
+                parameters,
+                commandType: CommandType.StoredProcedure,
+                splitOn: "Id" // Split the result set at the first 'Id' of the AppUser table
+            );
+            return newComment.Single();
         }
 
         public async Task<Comment?> DeleteAsync(int id)
         {
-            var commentModel = await _context.Comments.FirstOrDefaultAsync(x => x.Id == id);
-
+            var commentModel = await GetByIdAsync(id);
             if (commentModel == null)
             {
                 return null;
             }
 
-            _context.Comments.Remove(commentModel);
-            await _context.SaveChangesAsync();
+            var sql = "sp_DeleteComment";
+            await _db.ExecuteAsync(sql, new { p_Id = id }, commandType: CommandType.StoredProcedure);
             return commentModel;
         }
 
         public async Task<List<Comment>> GetAllAsync(CommentQueryObject queryObject)
         {
-            var comments = _context.Comments.Include(a => a.AppUser).AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(queryObject.Symbol))
+            var sql = "sp_GetAllComments";
+            var parameters = new 
             {
-                comments = comments.Where(s => s.Stock.Symbol == queryObject.Symbol);
+                p_Symbol = queryObject.Symbol,
+                p_IsDescending = queryObject.IsDecsending
             };
-            if (queryObject.IsDecsending == true)
-            {
-                comments = comments.OrderByDescending(c => c.CreatedOn);
-            }
-            return await comments.ToListAsync();
+
+            var comments = await _db.QueryAsync<Comment, AppUser, Comment>(
+                sql,
+                (comment, appUser) => 
+                {
+                    comment.AppUser = appUser;
+                    return comment;
+                },
+                parameters,
+                commandType: CommandType.StoredProcedure,
+                splitOn: "Id"
+            );
+            return comments.ToList();
         }
 
         public async Task<Comment?> GetByIdAsync(int id)
         {
-            return await _context.Comments.Include(a => a.AppUser).FirstOrDefaultAsync(c => c.Id == id);
+            var sql = "sp_GetCommentById";
+            var comments = await _db.QueryAsync<Comment, AppUser, Comment>(
+                sql,
+                (comment, appUser) => 
+                {
+                    comment.AppUser = appUser;
+                    return comment;
+                },
+                new { p_Id = id },
+                commandType: CommandType.StoredProcedure,
+                splitOn: "Id"
+            );
+            return comments.FirstOrDefault();
         }
 
         public async Task<Comment?> UpdateAsync(int id, Comment commentModel)
         {
-            var existingComment = await _context.Comments.FindAsync(id);
-
-            if (existingComment == null)
+            var sql = "sp_UpdateComment";
+            var parameters = new
             {
-                return null;
-            }
+                p_Id = id,
+                p_Title = commentModel.Title,
+                p_Content = commentModel.Content
+            };
 
-            existingComment.Title = commentModel.Title;
-            existingComment.Content = commentModel.Content;
-
-            await _context.SaveChangesAsync();
-
-            return existingComment;
+            var updatedComments = await _db.QueryAsync<Comment, AppUser, Comment>(
+                sql,
+                (comment, appUser) =>
+                {
+                    comment.AppUser = appUser;
+                    return comment;
+                },
+                parameters,
+                commandType: CommandType.StoredProcedure,
+                splitOn: "Id"
+            );
+            return updatedComments.FirstOrDefault();
         }
     }
 }
