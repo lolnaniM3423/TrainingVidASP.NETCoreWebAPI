@@ -1,0 +1,8 @@
+DELIMITER $$
+CREATE PROCEDURE `sp_StockExists`(
+    IN p_Id INT
+)
+BEGIN
+    SELECT COUNT(1) FROM Stocks WHERE Id = p_Id;
+END$$
+DELIMITER ;

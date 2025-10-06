@@ -1,0 +1,8 @@
+DELIMITER $$
+CREATE PROCEDURE `sp_DeleteComment`(
+    IN p_Id INT
+)
+BEGIN
+    DELETE FROM Comments WHERE Id = p_Id;
+END$$
+DELIMITER ;

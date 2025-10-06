@@ -1,0 +1,8 @@
+DELIMITER $$
+CREATE PROCEDURE `sp_DeleteStock`(
+    IN p_Id INT
+)
+BEGIN
+    DELETE FROM Stocks WHERE Id = p_Id;
+END$$
+DELIMITER ;
